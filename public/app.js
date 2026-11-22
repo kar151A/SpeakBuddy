@@ -2,7 +2,7 @@ import { defaults, tutors, scenarios } from './catalog.js';
 import { guidedTurn, hintFor, makeReport } from './coach.js';
 import { loadDevice, savePrefs, saveLocal, clearLocal, practicePatterns } from './store.js';
 import { VoiceInput, speak, cancelSpeech, voiceFor, hasRecognition } from './audio.js';
-import { clipFor } from './clip-audio.js';
+import { clipFor, playLiveSpeech } from './clip-audio.js';
 import { icon } from './icons.js';
 import * as ui from './views.js';
 
@@ -66,34 +66,51 @@ function setPhase(next) {
   },12000);
 }
 let voiceConversation=false;
+let speechRequest;
 const voiceInput=new VoiceInput(setPhase,(text, final)=>{
   if(view!=='call')return;$('#draft').value=text.slice(0,1200);draftSource='speech';transcriptDraft=$('#draft').value;
   if(final && voiceConversation)void submitTurn();
 },message=>{voiceConversation=false;notice(message);});
 function stopMedia() {
-  speakingVersion++;voiceInput.cancel();cancelSpeech();pending?.abort();pending=null;clearTimeout(hintTimer);
+  speechRequest?.abort();speakingVersion++;voiceInput.cancel();cancelSpeech();pending?.abort();pending=null;clearTimeout(hintTimer);
 }
-function speakTutor() {
+async function speakTutor() {
   if(!session||view!=='call')return;
   const version=++speakingVersion;
   const text=session.turns.at(-1).text;
   const p=state.prefs;
+  const activeSession = session;
+  const onState = active => {
+    if(version!==speakingVersion||session!==activeSession||view!=='call'||!['ready','speaking'].includes(phase))return;
+    setPhase(active?'speaking':'ready');
+    if(!active && voiceConversation && !document.hidden)startMic();
+  };
+  const stage = $('#stage');
+  const unavailable = () => {if(version===speakingVersion)notice('Audio playback is unavailable. Tap Replay or read the transcript.');};
+  speechRequest?.abort();
+  if(session.mode==='live' && p.sound) {
+    const controller=speechRequest=new AbortController();
+    stage.classList.add('audio-driven');
+    try {
+      await playLiveSpeech(text,p,controller.signal,onState,value=>stage.style.setProperty('--mouth',value));
+      return;
+    } catch {
+      if(controller.signal.aborted || version!==speakingVersion)return;
+      stage.classList.remove('audio-driven');
+    }
+  }
   if(!voiceFor(p) && p.sound) {
     const clip=clipFor(text,p.tutor);
     if(clip && !clip.exact)notice('Studio voice reads the follow-up question. The full reply is in the transcript.');
     if(!clip)notice('This reply is available as text. An installed English voice can read it aloud.');
   }
-  if(!speak(text,p,active=>{
-    if(version!==speakingVersion||view!=='call'||!['ready','speaking'].includes(phase))return;
-    setPhase(active?'speaking':'ready');
-    if(!active && voiceConversation && !document.hidden)startMic();
-  },()=>{if(version===speakingVersion)notice('Audio playback is unavailable. Tap Replay or read the transcript.');}))setPhase('ready');
+  if(!speak(text,p,onState,unavailable))setPhase('ready');
 }
 function paintTurn() {
   const p=state.prefs;
   const last=session.turns.at(-1);
   $('#caption').hidden=!p.captions;
-  $('#caption').innerHTML=`<p class="caption-text">${ui.esc(last.text)}</p>`;
+  $('#caption').innerHTML=`<p class="caption-text">${ui.esc(last.text)}</p>${typeof last.source==='string' && last.source.startsWith('https://')?'<a target="_blank" rel="noopener noreferrer" href="'+ui.esc(last.source)+'">Source</a>':''}`;
   $('#transcript').innerHTML=session.turns.map(m=>`<p><b>${m.role==='user'?'You':tutors[session.tutor].name}</b> ${ui.esc(m.text)}</p>`).join('');
   $('#correction').innerHTML=last.correction&&p.corrections!=='Report only'?`<details class="correction" open><summary>${icon('leaf',15)} Try saying</summary><b>“${ui.esc(last.correction.recast)}”</b><p>${ui.esc(last.correction.why)}</p></details>`:'';
   $('#mode-pill').textContent=session.mode==='guided'?'Guided practice':'Live AI';
@@ -131,7 +148,7 @@ async function submitTurn() {
     } else result=guidedTurn(data);
     if(current!==session||view!=='call')return;
     const input=draftSource==='speech' && transcriptDraft ? 'speech':'typed';
-    session.turns.push({role:'user',text,turn,input},{role:'assistant',text:result.reply,turn,correction:result.correction,vocabulary:result.vocabulary});
+    session.turns.push({role:'user',text,turn,input},{role:'assistant',text:result.reply,source:result.source,turn,correction:result.correction,vocabulary:result.vocabulary});
     if (session.mode!==session.engine) session.engine='mixed';
     draft.value='';transcriptDraft='';draftSource='typed';paintTurn();speakTutor();
   } catch(e) {
@@ -150,7 +167,7 @@ function requestMic() {
   const text=session.mode==='live'?'Live mode sends one recording of up to 35 seconds to the configured AI provider for transcription.':'Your browser’s speech service may send audio to its provider. Availability varies by browser.';
   showDialog('Use your microphone?',`<p>${text} ${session.mode==='live'?'Pausing after speaking automatically sends the transcript to the tutor.':'Review and edit the transcript before sending it.'} SpeakBuddy does not save raw audio.</p><label class="agree"><input type="checkbox" id="remember-mic"><span>Remember this choice on this device</span></label>`,ui.btn('allow-mic','Allow for practice')+ui.btn('dismiss','Keep typing','secondary'));
 }
-function startMic() {voiceConversation=session.mode==='live';speakingVersion++;notice('');voiceInput.start(session.mode,state.prefs.accent);}
+function startMic() {speechRequest?.abort();voiceConversation=session.mode==='live';speakingVersion++;notice('');voiceInput.start(session.mode,state.prefs.accent);}
 function showHint() {
   const recall=state.prefs.remember?practicePatterns(state.reports).find(([,count])=>count>=2):null;
   $('#help-box').innerHTML=`<div class="hint"><b>Sentence starter</b><p>${ui.esc(hintFor(session.scenario,state.prefs.bridge))}</p>${recall?'<small>From your practice journal · '+ui.esc(recall[0])+'</small>':''}</div>`;
@@ -192,7 +209,7 @@ function changeSound() {
   state.prefs.sound=!state.prefs.sound;persistPrefs();
   $('#sound-btn').innerHTML=icon(state.prefs.sound?'volume':'mute',18);
   $('#sound-btn').setAttribute('aria-label',state.prefs.sound?'Mute tutor':'Enable tutor voice');
-  if(!state.prefs.sound){voiceConversation=false;speakingVersion++;cancelSpeech();if(phase==='speaking')setPhase('ready');}
+  if(!state.prefs.sound){speechRequest?.abort();voiceConversation=false;speakingVersion++;cancelSpeech();if(phase==='speaking')setPhase('ready');}
   else if(['ready','speaking'].includes(phase))speakTutor();
 }
 const actions={

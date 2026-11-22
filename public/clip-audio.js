@@ -34,3 +34,45 @@ export function playClip(text,prefs,notify,onError) {
   run().catch(()=>{if(g===generation){notify(false);onError?.();}});
   return true;
 }
+
+export async function playLiveSpeech(text, prefs, signal, onState, onMouth) {
+  stopClip();
+  const run = generation;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) throw Error('Audio playback unavailable');
+  context ||= new AudioCtx();
+  await context.resume();
+  const response = await fetch('/api/v1/speech', {
+    method:'POST', signal,
+    headers:{'Content-Type':'application/json','X-SpeakBuddy-Consent':'adult-live-v1'},
+    body:JSON.stringify({text,tutor:prefs.tutor})
+  });
+  if (!response.ok) throw Error('Cloud voice unavailable');
+  const buffer = await context.decodeAudioData(await response.arrayBuffer());
+  if (run !== generation || signal.aborted) return;
+  const player = source = context.createBufferSource();
+  const meter = context.createAnalyser();
+  meter.fftSize = 512;
+  const samples = new Float32Array(meter.fftSize);
+  player.buffer = buffer;
+  player.playbackRate.value = Number(prefs.speed);
+  player.connect(meter).connect(context.destination);
+  function animate() {
+    if (source !== player || run !== generation || signal.aborted) return;
+    meter.getFloatTimeDomainData(samples);
+    const level = Math.sqrt(samples.reduce((sum, sample)=>sum+sample*sample,0)/samples.length);
+    onMouth(Math.min(1,Math.max(0,(level-0.008)*19)));
+    requestAnimationFrame(animate);
+  }
+  player.onended = () => {
+    player.disconnect();
+    meter.disconnect();
+    if (source !== player || run !== generation) return;
+    source = null;
+    onMouth(0);
+    onState(false);
+  };
+  onState(true);
+  player.start();
+  animate();
+}
