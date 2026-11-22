@@ -85,7 +85,7 @@ export function callView(s,p) {
   <div class="call-controls"><div class="call-state"><span class="mode-pill" id="mode-pill">${s.mode==='live'?'Live AI':'Guided practice'}</span><span id="call-status" role="status">Your turn</span></div>
   <div id="caption" aria-live="polite"></div><div id="correction"></div><div id="help-box"></div><div id="call-error" role="status"></div>
   <form id="turn-form"><label for="draft">Your reply</label><div class="composer"><textarea id="draft" rows="2" maxlength="1200" placeholder="Type here or use the microphone…"></textarea><button type="submit" class="send" aria-label="Send reply" disabled>${icon('send',18)}</button></div></form>
-  <div class="call-actions">${btn('mic',icon('mic',18)+'<span>Speak</span>','primary mic-button')}${btn('hint',icon('bulb',18)+' Hint','secondary')}<button class="icon-btn" data-act="replay" aria-label="Replay tutor">${icon('repeat',18)}</button></div>
+  <div class="call-actions">${btn('mic',icon('mic',18)+'<span>Speak</span>','primary mic-button')}${s.mode==='live'?'<button class="secondary" data-act="pause-voice" hidden>Pause voice</button>':''}${btn('hint',icon('bulb',18)+' Hint','secondary')}<button class="icon-btn" data-act="replay" aria-label="Replay tutor">${icon('repeat',18)}</button></div>
   <details class="transcript"><summary>Conversation transcript</summary><div id="transcript"></div></details></div>`;
 }
 export function summary(r,saved,latest) {

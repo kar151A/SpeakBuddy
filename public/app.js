@@ -54,7 +54,9 @@ function setPhase(next) {
   const label={ready:'Your turn',speaking:'Tutor speaking',requesting:'Opening microphone…',listening:'Listening…',transcribing:'Preparing transcript…',thinking:'Tutor is thinking…'};
   $('#call-status').textContent=label[next];
   $('#stage').classList.toggle('talking',next==='speaking');
-  $('.mic-button span').textContent=next==='listening'?(session?.mode==='live'?'Pause voice':'Finish recording'):'Speak';
+  $('.mic-button span').textContent=next==='listening'?(session?.mode==='live'?'Send recording':'Finish recording'):'Speak';
+  const pause = $('[data-act="pause-voice"]');
+  if(pause)pause.hidden=next!=='listening';
   $('.mic-button').disabled=['thinking','requesting','transcribing'].includes(next);
   $('.send').disabled=!$('#draft').value.trim()||!['ready','speaking'].includes(next);
   $('#draft').readOnly=['thinking','requesting','listening','transcribing'].includes(next);
@@ -139,7 +141,7 @@ async function submitTurn() {
   } finally {if(current===session)pending=null;}
 }
 function requestMic() {
-  if(phase==='listening'){if(session.mode==='live'){voiceConversation=false;voiceInput.cancel();setPhase('ready');}else voiceInput.stop();return;}
+  if(phase==='listening'){voiceInput.stop();return;}
   if(!['ready','speaking'].includes(phase))return;
   if(session.mode==='live'&&voiceConversation){voiceConversation=false;return;}
   if(session.mode==='guided'&&!hasRecognition()){notice('Browser speech recognition is unavailable here. On Windows, focus the reply field and press Windows + H. On iPhone, use the keyboard microphone.');$('#draft').focus();return;}
@@ -201,6 +203,7 @@ const actions={
   filter:id=>{category=id;document.querySelectorAll('[data-act=filter]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===id));$('#scene-grid').innerHTML=ui.filterScenes(category,$('#scene-search').value);},
   'pick-tutor':id=>{selectedTutor=id;navigate('tutors',false);},
   'preview-voice':()=>{const d=Object.fromEntries(new FormData($('#tutor-form')));const ok=speak('Take your time. What would you like to practise?',{...state.prefs,...d,tutor:selectedTutor,sound:true},()=>{});if(!ok)snack('No local English voice is available. Captions are available.');},
+  'pause-voice':()=>{voiceConversation=false;voiceInput.cancel();setPhase('ready');},
   mic:requestMic,'allow-mic':()=>{const keep=$('#remember-mic').checked;closeDialog();micAllowedFor=session.mode;if(keep){state.prefs.micConsent=session.mode;persistPrefs();}startMic();},
   hint:showHint,end:askEnd,finish,dismiss:closeDialog,sound:changeSound,
   replay:()=>{if(!['ready','speaking'].includes(phase))return;if(!state.prefs.sound){notice('Enable tutor voice to replay audio.');return;}speakTutor();},

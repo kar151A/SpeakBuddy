@@ -56,11 +56,6 @@ export class VoiceInput {
         const now = performance.now();
         if (rms > 0.012) { speechSamples++; lastSpeech = now; }
         if (speechSamples >= 3 && now - lastSpeech > 1100) this.stop();
-        if (speechSamples < 3 && now - began > 12000) {
-          this.cancel();
-          this.onStatus('ready');
-          this.onError('No speech detected. Check your microphone and tap Speak to try again.');
-        }
       }, 60);
       context.resume().catch(()=>this.stopMeter());
     } catch { this.stopMeter(); }
@@ -126,7 +121,9 @@ export class VoiceInput {
         stream.getTracks().forEach(t=>t.stop());
         clearTimeout(this.timer);
         if(!current())return;
-        this.recorder=null;this.stream=null;this.onStatus('transcribing');
+        this.recorder=null;this.stream=null;
+        if (!chunks.length) return fail('The browser captured no audio. Check the selected microphone and try again.');
+        this.onStatus('transcribing');
         try {
           this.controller=new AbortController();
           const res=await fetch('/api/v1/transcriptions',{method:'POST',headers:{'Content-Type':mime,'X-SpeakBuddy-Consent':'adult-live-v1'},body:new Blob(chunks,{type:mime}),signal:this.controller.signal});
