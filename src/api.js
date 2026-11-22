@@ -98,7 +98,9 @@ export function createApi(catalog, prompts, records) {
         form.append('model',env.GROQ_API_KEY ? 'whisper-large-v3-turbo' : (env.OPENAI_TRANSCRIBE_MODEL || 'gpt-transcribe'));
         form.append('file',blob,'utterance.'+ext);
         const out = await provider('audio/transcriptions',{method:'POST',body:form},env);
-        if (!out.ok) return error('Transcription unavailable. Type your turn.',502);
+        if (out.status === 401 || out.status === 403) return error('The voice provider rejected the server API key. Check GROQ_API_KEY.',502);
+        if (out.status === 429) return error('The voice provider rate limit was reached. Try again shortly.',429);
+        if (!out.ok) return error('The voice provider could not transcribe this recording. Tap Speak to retry.',502);
         const result = await out.json();
         return typeof result.text === 'string' ? json({text:result.text.slice(0,1200)}) : error('No transcript received.',502);
       }

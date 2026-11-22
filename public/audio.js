@@ -35,7 +35,38 @@ export class VoiceInput {
   constructor(onStatus,onDraft,onError) {
     this.onStatus=onStatus; this.onDraft=onDraft; this.onError=onError; this.version=0;
   }
+  stopMeter() {
+    clearInterval(this.meter);
+    this.audioContext?.close().catch(()=>{});
+    this.audioContext=null;
+  }
+  watchSpeech(stream) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    try {
+      const context = this.audioContext = new AudioContext();
+      const analyser = context.createAnalyser();
+      context.createMediaStreamSource(stream).connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      const began = performance.now();
+      let speechSamples = 0, lastSpeech = began;
+      this.meter = setInterval(() => {
+        analyser.getFloatTimeDomainData(samples);
+        const rms = Math.sqrt(samples.reduce((sum, s) => sum + s * s, 0) / samples.length);
+        const now = performance.now();
+        if (rms > 0.012) { speechSamples++; lastSpeech = now; }
+        if (speechSamples >= 3 && now - lastSpeech > 1100) this.stop();
+        if (speechSamples < 3 && now - began > 12000) {
+          this.cancel();
+          this.onStatus('ready');
+          this.onError('No speech detected. Check your microphone and tap Speak to try again.');
+        }
+      }, 60);
+      context.resume().catch(()=>this.stopMeter());
+    } catch { this.stopMeter(); }
+  }
   cancel() {
+    this.stopMeter();
     this.version++;
     clearTimeout(this.timer);
     if(this.recognition) { this.recognition.onend=null; try {this.recognition.abort();} catch {} this.recognition=null; }
@@ -45,6 +76,7 @@ export class VoiceInput {
     this.controller?.abort();
   }
   stop() {
+    this.stopMeter();
     clearTimeout(this.timer);
     if(this.recognition) {try {this.recognition.stop();} catch {}}
     if(this.recorder?.state==='recording') this.recorder.stop();
@@ -100,10 +132,14 @@ export class VoiceInput {
           const res=await fetch('/api/v1/transcriptions',{method:'POST',headers:{'Content-Type':mime,'X-SpeakBuddy-Consent':'adult-live-v1'},body:new Blob(chunks,{type:mime}),signal:this.controller.signal});
           const data=await res.json();
           if(!res.ok) throw Error(data.error||'Could not transcribe. You can type instead.');
-          if(current()){this.onDraft(data.text);this.onStatus('ready');}
+          if(current()){
+            if(!data.text?.trim()) return fail('No words were transcribed. Tap Speak and try again.');
+            this.onStatus('ready');
+            this.onDraft(data.text, true);
+          }
         } catch(e){if(current())fail(e.message);}
       };
-      rec.start();this.onStatus('listening');this.timer=setTimeout(()=>this.stop(),35000);
+      rec.start();this.onStatus('listening');this.watchSpeech(stream);this.timer=setTimeout(()=>this.stop(),35000);
     } catch {fail('Microphone unavailable or permission declined. Type your reply below.');}
   }
 }

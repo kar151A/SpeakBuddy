@@ -27,7 +27,7 @@ function closeDialog() { if(modal.open)modal.close(); }
 function notice(message) {const e=$('#call-error');if(e)e.textContent=message;sessionError=message;}
 function navigate(next,focus=true) {
   clearTimeout(hintTimer);
-  if(view==='call' && next!=='call')stopMedia();
+  if(view==='call' && next!=='call'){voiceConversation=false;stopMedia();}
   view=next;
   $('#header').innerHTML=ui.header(next);
   const withNav=['home','tutors','progress'].includes(next);
@@ -54,7 +54,7 @@ function setPhase(next) {
   const label={ready:'Your turn',speaking:'Tutor speaking',requesting:'Opening microphone…',listening:'Listening…',transcribing:'Preparing transcript…',thinking:'Tutor is thinking…'};
   $('#call-status').textContent=label[next];
   $('#stage').classList.toggle('talking',next==='speaking');
-  $('.mic-button span').textContent=next==='listening'?'Finish recording':'Speak';
+  $('.mic-button span').textContent=next==='listening'?(session?.mode==='live'?'Pause voice':'Finish recording'):'Speak';
   $('.mic-button').disabled=['thinking','requesting','transcribing'].includes(next);
   $('.send').disabled=!$('#draft').value.trim()||!['ready','speaking'].includes(next);
   $('#draft').readOnly=['thinking','requesting','listening','transcribing'].includes(next);
@@ -63,9 +63,11 @@ function setPhase(next) {
     if(view==='call'&&phase==='ready'&&!$('#draft').value&&!modal.open)$('#help-box').innerHTML='<p class="quiet-hint">Take your time. Tap Hint for a sentence starter.</p>';
   },12000);
 }
-const voiceInput=new VoiceInput(setPhase,text=>{
+let voiceConversation=false;
+const voiceInput=new VoiceInput(setPhase,(text, final)=>{
   if(view!=='call')return;$('#draft').value=text.slice(0,1200);draftSource='speech';transcriptDraft=$('#draft').value;
-},notice);
+  if(final && voiceConversation)void submitTurn();
+},message=>{voiceConversation=false;notice(message);});
 function stopMedia() {
   speakingVersion++;voiceInput.cancel();cancelSpeech();pending?.abort();pending=null;clearTimeout(hintTimer);
 }
@@ -80,7 +82,9 @@ function speakTutor() {
     if(!clip)notice('This reply is available as text. An installed English voice can read it aloud.');
   }
   if(!speak(text,p,active=>{
-    if(version===speakingVersion&&view==='call'&&['ready','speaking'].includes(phase))setPhase(active?'speaking':'ready');
+    if(version!==speakingVersion||view!=='call'||!['ready','speaking'].includes(phase))return;
+    setPhase(active?'speaking':'ready');
+    if(!active && voiceConversation && !document.hidden)startMic();
   },()=>{if(version===speakingVersion)notice('Audio playback is unavailable. Tap Replay or read the transcript.');}))setPhase('ready');
 }
 function paintTurn() {
@@ -130,20 +134,21 @@ async function submitTurn() {
     draft.value='';transcriptDraft='';draftSource='typed';paintTurn();speakTutor();
   } catch(e) {
     if(current!==session||view!=='call'||e.name==='AbortError')return;
-    setPhase('ready');notice(e.message);
+    voiceConversation=false;setPhase('ready');notice(e.message);
     $('#help-box').innerHTML=ui.btn('use-guided','Continue in guided practice','secondary');
   } finally {if(current===session)pending=null;}
 }
 function requestMic() {
-  if(phase==='listening'){voiceInput.stop();return;}
+  if(phase==='listening'){if(session.mode==='live'){voiceConversation=false;voiceInput.cancel();setPhase('ready');}else voiceInput.stop();return;}
   if(!['ready','speaking'].includes(phase))return;
+  if(session.mode==='live'&&voiceConversation){voiceConversation=false;return;}
   if(session.mode==='guided'&&!hasRecognition()){notice('Browser speech recognition is unavailable here. On Windows, focus the reply field and press Windows + H. On iPhone, use the keyboard microphone.');$('#draft').focus();return;}
   if($('#draft').value.trim()) {notice('Send or clear your current reply before recording a new one.');return;}
   if(micAllowedFor===session.mode || state.prefs.micConsent===session.mode){startMic();return;}
   const text=session.mode==='live'?'Live mode sends one recording of up to 35 seconds to the configured AI provider for transcription.':'Your browser’s speech service may send audio to its provider. Availability varies by browser.';
-  showDialog('Use your microphone?',`<p>${text} Review and edit the transcript before sending it. SpeakBuddy does not save raw audio.</p><label class="agree"><input type="checkbox" id="remember-mic"><span>Remember this choice on this device</span></label>`,ui.btn('allow-mic','Allow for practice')+ui.btn('dismiss','Keep typing','secondary'));
+  showDialog('Use your microphone?',`<p>${text} ${session.mode==='live'?'Pausing after speaking automatically sends the transcript to the tutor.':'Review and edit the transcript before sending it.'} SpeakBuddy does not save raw audio.</p><label class="agree"><input type="checkbox" id="remember-mic"><span>Remember this choice on this device</span></label>`,ui.btn('allow-mic','Allow for practice')+ui.btn('dismiss','Keep typing','secondary'));
 }
-function startMic() {speakingVersion++;notice('');voiceInput.start(session.mode,state.prefs.accent);}
+function startMic() {voiceConversation=session.mode==='live';speakingVersion++;notice('');voiceInput.start(session.mode,state.prefs.accent);}
 function showHint() {
   const recall=state.prefs.remember?practicePatterns(state.reports).find(([,count])=>count>=2):null;
   $('#help-box').innerHTML=`<div class="hint"><b>Sentence starter</b><p>${ui.esc(hintFor(session.scenario,state.prefs.bridge))}</p>${recall?'<small>From your practice journal · '+ui.esc(recall[0])+'</small>':''}</div>`;
@@ -154,7 +159,7 @@ async function saveReportLocally(r) {
 }
 function askEnd() {
   if(!session)return;
-  stopMedia();setPhase('ready');
+  voiceConversation=false;stopMedia();setPhase('ready');
   showDialog('Finish your session?',`<p>How comfortable did speaking feel? Your rating is optional.</p><label class="field"><span>Your confidence</span><select id="rating"><option value="">Skip rating</option>${['1 · Very unsure','2 · Unsure','3 · Okay','4 · Comfortable','5 · Very comfortable'].map((v,i)=>`<option value="${i+1}">${v}</option>`).join('')}</select></label>`,ui.btn('finish','Finish & see report')+ui.btn('dismiss','Keep practising','secondary'));
 }
 async function finish() {
@@ -185,7 +190,7 @@ function changeSound() {
   state.prefs.sound=!state.prefs.sound;persistPrefs();
   $('#sound-btn').innerHTML=icon(state.prefs.sound?'volume':'mute',18);
   $('#sound-btn').setAttribute('aria-label',state.prefs.sound?'Mute tutor':'Enable tutor voice');
-  if(!state.prefs.sound){speakingVersion++;cancelSpeech();if(phase==='speaking')setPhase('ready');}
+  if(!state.prefs.sound){voiceConversation=false;speakingVersion++;cancelSpeech();if(phase==='speaking')setPhase('ready');}
   else if(['ready','speaking'].includes(phase))speakTutor();
 }
 const actions={
@@ -228,7 +233,7 @@ document.addEventListener('change',e=>{
   if(e.target.name==='engine')$('#mode-note').textContent=e.target.value==='live'?'Live AI sends confirmed turns, recent conversation and opted-in practice patterns to the configured AI provider. Live microphone audio goes to the same provider.':'Guided practice uses built-in questions and language patterns. The microphone is optional.';
 });
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden&&view==='call'){stopMedia();setPhase('ready');notice('Practice paused. Your draft is here when you return.');}
+  if(document.hidden&&view==='call'){voiceConversation=false;stopMedia();setPhase('ready');notice('Practice paused. Your draft is here when you return.');}
 });
 window.addEventListener('pagehide',stopMedia);
 function clock() {$('#clock').textContent=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\s?[AP]M/i,'');}
