@@ -115,9 +115,9 @@ export function createApi(catalog, prompts, records) {
       const instructions = [prompts.tutorPrompt,prompts.grammarPrompt,prompts.rolePrompt].join('\n');
       const groq = Boolean(env.GROQ_API_KEY);
       const out = await provider(groq ? 'chat/completions' : 'responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(groq ? {
-        model:'llama-3.1-8b-instant',
+        model:'openai/gpt-oss-20b', reasoning_effort:'low',
         messages:[{role:'system',content:instructions+' Respond with a JSON object containing reply, correction and vocabulary. Use null for absent correction or vocabulary.'},{role:'user',content:JSON.stringify(data)}],
-        response_format:{type:'json_object'},max_completion_tokens:380
+        response_format:{type:'json_schema',json_schema:{name:'tutor_turn',strict:true,schema:turnSchema}},max_completion_tokens:1024
       } : {
         model:env.OPENAI_MODEL || 'gpt-6-luna',store:false,instructions,
         input:JSON.stringify(data),reasoning:{effort:'none'},max_output_tokens:380,
