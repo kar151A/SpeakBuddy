@@ -246,9 +246,6 @@ selectedTutor=state.prefs.tutor;selectedScene=state.prefs.scenario;
 navigate('home',false);
 fetch('/api/v1/config').then(r=>r.json()).then(c=>{
   state.config=c;
-  if(view==='setup'&&c.live) {
-    const select=document.querySelector('select[name=engine]');
-    if(select&&!select.querySelector('[value=live]'))select.add(new Option('Live AI','live'));
-  }
+  if(view==='setup'&&(c.live||c.signInRequired))navigate('setup',false);
   if(view==='settings')navigate('settings',false);
 }).catch(()=>{});

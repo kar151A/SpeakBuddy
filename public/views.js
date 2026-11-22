@@ -70,8 +70,9 @@ export function setup({prefs:p,config},scenario) {
   <form id="setup-form" class="form-stack">${field('Tutor','tutor',Object.entries(tutors).map(([k,t])=>[k,t.name+' · '+t.description]),p.tutor)}
   ${field('English level','level',levels,p.level)}${field('Bridge language','bridge',languages,p.bridge)}
   ${field('Correction timing','corrections',['During practice','Report only'],p.corrections)}
-  ${field('Conversation mode','engine',config.live?[['guided','Guided practice'],['live','Live AI']]:[['guided','Guided practice']],config.live?p.engine:'guided')}
-  <p class="fine" id="mode-note">${p.engine==='live'&&config.live?'Live AI sends confirmed turns, recent conversation and opted-in practice patterns to the configured AI provider. Live microphone audio goes to the same provider.':'Guided practice uses built-in questions and language patterns. The microphone is optional.'}</p>
+  ${field('Conversation mode','engine',config.live?[['guided','Guided practice'],['live','Live AI']]:[['guided','Guided practice']],config.live?'live':'guided')}
+  <p class="fine" id="mode-note">${config.live?'Live AI sends confirmed turns, recent conversation and opted-in practice patterns to the configured AI provider. Live microphone audio goes to the same provider.':'Guided practice uses built-in questions and language patterns. The microphone is optional.'}</p>
+  ${config.signInRequired?'<p class="fine">For open conversation and microphone transcription, <a href="/signin-with-chatgpt?return_to=%2F" target="_top">sign in to Live AI</a>.</p>':''}
   ${toggle('remember','Remember my practice','Keep reports and short correction excerpts on this device for 30 days.',p.remember)}
   <label class="agree"><input type="checkbox" name="adult" required ${p.adult?'checked':''}><span>I’m 18 or older and understand this is an AI tutor.</span></label>
   <button type="submit" class="primary wide">${icon('mic',18)} Begin session</button></form>`;

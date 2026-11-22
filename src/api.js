@@ -60,7 +60,7 @@ export function createApi(catalog, prompts, records) {
     if (!['GET','HEAD'].includes(method) && origin && origin !== new URL(request.url).origin) return error('Cross-origin request declined.',403);
     const db = env.DB;
     try {
-      if (method === 'GET' && path === '/config') return json({ live: Boolean((env.GROQ_API_KEY || env.OPENAI_API_KEY) && owner && db), sync: Boolean(db && owner), ...(env.GROQ_API_KEY ? {provider:'Groq'} : {}) });
+      if (method === 'GET' && path === '/config') return json({ live: Boolean((env.GROQ_API_KEY || env.OPENAI_API_KEY) && owner && db), sync: Boolean(db && owner), ...(env.GROQ_API_KEY ? {provider:'Groq', ...(!owner ? {signInRequired:true} : {})} : {}) });
       if (method === 'GET' && path === '/catalog') return json({tutors:catalog.tutors,scenarios:catalog.scenarios});
       if (!owner) return error('Sign in to use this feature.',401);
       if (method === 'GET' && path === '/sessions') return db ? json({reports:await records.readReports(db,owner)}) : error('Sync unavailable.',503);
