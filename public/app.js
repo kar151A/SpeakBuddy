@@ -1,6 +1,6 @@
 import { defaults, tutors, scenarios } from './catalog.js';
 import { guidedTurn, hintFor, makeReport } from './coach.js';
-import { loadDevice, savePrefs, saveLocal, clearLocal, practicePatterns } from './store.js';
+import { selectAccount, loadDevice, savePrefs, saveLocal, clearLocal, practicePatterns } from './store.js';
 import { VoiceInput, speak, cancelSpeech, voiceFor, hasRecognition } from './audio.js';
 import { clipFor, playLiveSpeech } from './clip-audio.js';
 import { icon } from './icons.js';
@@ -192,7 +192,9 @@ async function finish() {
   navigate('summary');
 }
 async function api(path,init={}) {
-  const res=await fetch('/api/v1'+path,init);const body=await res.json();
+  const headers=new Headers(init.headers);
+  if(state.config.account)headers.set('X-SpeakBuddy-Account',state.config.account.owner);
+  const res=await fetch('/api/v1'+path,{...init,headers});const body=await res.json();
   if(!res.ok)throw Error(body.error||'Could not complete this action.');return body;
 }
 async function syncReports() {
@@ -254,7 +256,8 @@ document.addEventListener('click',async e=>{
   try{await actions[b.dataset.act]?.(b.dataset.id);}catch(err){snack(err.message||'Please try again.');}
 });
 document.addEventListener('submit',async e=>{
-  e.preventDefault();const f=e.target;
+  const f=e.target;if(f.getAttribute('action')==='/api/v1/auth/logout')return;
+  e.preventDefault();
   if(f.id==='turn-form')return submitTurn();
   if(f.id==='setup-form')return begin(f);
   const d=new FormData(f);
@@ -274,11 +277,11 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('pagehide',stopMedia);
 function clock() {$('#clock').textContent=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\s?[AP]M/i,'');}
 clock();setInterval(clock,30000);
+try {
+  const response=await fetch('/api/v1/config');
+  if(response.ok)state.config=await response.json();
+  selectAccount(state.config.account?.owner);
+} catch {}
 try{Object.assign(state,await loadDevice());}catch{snack('Device storage unavailable. You can still practise in this tab.');}
 selectedTutor=state.prefs.tutor;selectedScene=state.prefs.scenario;
 navigate('home',false);
-fetch('/api/v1/config').then(r=>r.json()).then(c=>{
-  state.config=c;
-  if(view==='setup'&&(c.live||c.signInRequired))navigate('setup',false);
-  if(view==='settings')navigate('settings',false);
-}).catch(()=>{});

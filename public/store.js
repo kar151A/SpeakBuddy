@@ -1,9 +1,12 @@
 import { defaults } from './catalog.js';
 
-let opening;
+let opening, databaseName='speakbuddy-studio';
+export function selectAccount(owner) {
+  if(owner)databaseName='speakbuddy-studio-'+owner;
+}
 function database() {
   if (!opening) opening = new Promise((resolve,reject)=>{
-    const req = indexedDB.open('speakbuddy-studio',1);
+    const req = indexedDB.open(databaseName,1);
     req.onupgradeneeded=()=>{
       req.result.createObjectStore('settings');
       req.result.createObjectStore('reports',{keyPath:'id'});

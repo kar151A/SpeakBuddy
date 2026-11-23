@@ -72,7 +72,7 @@ export function setup({prefs:p,config},scenario) {
   ${field('Correction timing','corrections',['During practice','Report only'],p.corrections)}
   ${field('Conversation mode','engine',config.live?[['guided','Guided practice'],['live','Live AI']]:[['guided','Guided practice']],config.live?'live':'guided')}
   <p class="fine" id="mode-note">${config.live?'Live AI sends confirmed turns, recent conversation and opted-in practice patterns to the configured AI provider. Live microphone audio goes to the same provider.':'Guided practice uses built-in questions and language patterns. The microphone is optional.'}</p>
-  ${config.signInRequired?'<p class="fine">For open conversation and microphone transcription, <a href="/signin-with-chatgpt?return_to=%2F" target="_top">sign in to Live AI</a>.</p>':''}
+  ${config.accounts && !config.account ? '<p><a href="/api/v1/auth/login">Sign in with email or Google for Live AI</a></p>' : config.signInRequired?'<p class="fine">For open conversation and microphone transcription, <a href="/signin-with-chatgpt?return_to=%2F" target="_top">sign in to Live AI</a>.</p>':''}
   ${toggle('remember','Remember my practice','Keep reports and short correction excerpts on this device for 30 days.',p.remember)}
   <label class="agree"><input type="checkbox" name="adult" required ${p.adult?'checked':''}><span>I’m 18 or older and understand this is an AI tutor.</span></label>
   <button type="submit" class="primary wide">${icon('mic',18)} Begin session</button></form>`;
@@ -114,7 +114,10 @@ export function progress({reports,prefs:p}) {
   ${section('Recent sessions')}${reports.length?reports.map(r=>`<button class="history" data-act="report" data-id="${r.id}">${art(scenarios[r.scenario].art)}<span><b>${scenarios[r.scenario].title}</b><small>${dateText(r.date)} · ${r.turnCount} ${r.turnCount===1?'turn':'turns'}</small></span>${icon('next',16)}</button>`).join(''):`<div class="empty"><span>${icon('book',24)}</span><b>Your journal starts here</b><p>Save a session report to see your practice over time.</p>${btn('start','Start practice','secondary')}</div>`}`;
 }
 export function settings({prefs:p,config}) {
-  return title('Preferences','Your settings.')+`<form id="settings-form" class="form-stack">
+  const account=config.accounts ? (config.account
+    ? `<p>Signed in as ${esc(config.account.email)}</p><form method="post" action="/api/v1/auth/logout"><button class="secondary">Sign out</button></form>`
+    : '<p><a class="secondary" href="/api/v1/auth/login">Sign in with email or Google</a></p>') : '';
+  return title('Preferences','Your settings.')+account+`<form id="settings-form" class="form-stack">
   <label class="field"><span>First name or nickname</span><input name="name" maxlength="26" value="${esc(p.name)}" placeholder="Optional"></label>
   ${field('Weekly practice goal','goal',[[2,'2 days'],[3,'3 days'],[5,'5 days'],[7,'7 days']],p.goal)}
   ${toggle('captions','Tutor captions','The transcript stays available throughout practice.',p.captions)}

@@ -58,3 +58,11 @@ The first release uses self-rated confidence and leaves pronunciation unassessed
 ## Visual assets
 
 Mira and Jay are original, fictional AI-generated characters. The expression frames and seven scenario images were generated for SpeakBuddy without real-person reference images. Bundled fallback clips use the licensed CMU Flite stock voices. See [voice asset notices](docs/VOICE-NOTICES.md). The sound-wave mark, UI and role-play text are original project work. The app requests no learner camera footage.
+
+### Email and Google accounts
+
+Create an Auth0 Regular Web Application. Enable the email/password database connection and the Google social connection for that application. For your own Google OAuth credentials use the callback URL shown in the Auth0 Google connection setup. In the Auth0 application allow the SpeakBuddy callback `http://localhost:5173/api/v1/auth/callback`. Use your exact HTTPS origin for a hosted instance.
+
+Copy the four account settings from `.env.example` to your local `.env`. Use the Auth0 domain without a scheme, the application's client ID and secret, and the exact origin you open in the browser. Restart the app. Open Settings and choose **Sign in with email or Google**. Passwords stay at Auth0. Sign-out revokes the SpeakBuddy session. Separate provider identities have separate practice histories.
+
+Local SQLite migrations run at startup. For a hosted Worker apply `drizzle/0001_account_sessions.sql` to its existing D1 database before enabling the four environment settings. With accounts enabled, guests can use guided practice. Account backups are opt-in under Settings. Prior guest reports remain in the device-only profile.
