@@ -19,6 +19,9 @@ export function withAccounts(api) {
     const sessionHash=session && /^[0-9a-f]{64}$/.test(session)?await digest(session):null;
     const db=env.DB;
     if(url.pathname==='/api/v1/auth/login' && request.method==='GET'){
+      // Start and finish on the same origin so the callback receives the PKCE cookie.
+      const start=new URL('/api/v1/auth/login',env.APP_ORIGIN);
+      if(url.origin!==start.origin)return new Response(null,{status:303,headers:{Location:start.href,'Cache-Control':'no-store'}});
       const verifier=token(), state=token();
       const target=new URL('/authorize',issuer);
       target.search=new URLSearchParams({response_type:'code',client_id:env.AUTH0_CLIENT_ID,scope:'openid email',redirect_uri:callback,state,code_challenge:await digest(verifier),code_challenge_method:'S256',prompt:'login'});

@@ -10,6 +10,9 @@ test('verified account sessions isolate access and expire on logout',async t=>{
     authFetch:async url=>Response.json(url.endsWith('/userinfo')?{sub:'google|123',email:'learner@example.org'}:{access_token:'verified-token'})};
   const handle=withAccounts(async(req,env,owner)=>Response.json({owner:owner||null}));
   const call=(path,init)=>handle(new Request(origin+'/api/v1/'+path,init),env,'device');
+  const alias=await handle(new Request('http://127.0.0.1:5173/api/v1/auth/login'),env,'device');
+  assert.equal(alias.headers.get('location'),origin+'/api/v1/auth/login');
+  assert.equal(alias.headers.get('set-cookie'),null);
   const login=await call('auth/login');
   const state=new URL(login.headers.get('location')).searchParams.get('state');
   const headers={cookie:login.headers.get('set-cookie').split(';')[0]};
