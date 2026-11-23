@@ -1,6 +1,6 @@
 import { tutors, scenarios, accents, levels, languages } from './catalog.js';
 import { icon } from './icons.js';
-import { localVoices } from './audio.js';
+import { tutorVoices } from './audio.js';
 import { week, practicePatterns } from './store.js';
 
 export const esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -59,9 +59,9 @@ export function tutorStudio({prefs:p},editId) {
   <form id="tutor-form" class="form-stack">
   ${field('Coaching style','personality',['Encouraging','Curious','Direct'],p.personality)}
   ${field('Preferred accent','accent',Object.entries(accents),p.accent)}
-  ${field('Device voice','voice',[['','Match accent automatically'],...localVoices().map(v=>[v.voiceURI,v.name+' · '+v.lang])],p.voice)}
+  ${field('Backup device voice','voice',[['','Match accent automatically'],...tutorVoices(editId).map(v=>[v.voiceURI,v.name+' · '+v.lang])],p.voice)}
   ${field('Speaking speed','speed',[[0.75,'Slow · 0.75×'],[0.9,'Gentle · 0.9×'],[1,'Natural · 1×'],[1.15,'Brisk · 1.15×']],p.speed)}
-  <p class="fine">An installed voice can read any reply. Otherwise the studio voice reads prepared prompts in US English.</p>
+  <p class="fine">Groq live sessions use a dedicated voice for each tutor. Guided practice and offline previews use a matching device voice or a recorded prompt.</p>
   <div class="button-pair">${btn('preview-voice',icon('volume',16)+' Hear voice','secondary')}<button class="primary" type="submit">Use ${t.name}</button></div></form>`;
 }
 export function setup({prefs:p,config},scenario) {

@@ -27,6 +27,7 @@ function closeDialog() { if(modal.open)modal.close(); }
 function notice(message) {const e=$('#call-error');if(e)e.textContent=message;sessionError=message;}
 function navigate(next,focus=true) {
   clearTimeout(hintTimer);
+  if(view==='tutors'){speechRequest?.abort();cancelSpeech();}
   if(view==='call' && next!=='call'){voiceConversation=false;stopMedia();}
   view=next;
   $('#header').innerHTML=ui.header(next);
@@ -219,7 +220,22 @@ const actions={
   scenario:id=>{selectedScene=id;from=view;navigate('setup');},
   filter:id=>{category=id;document.querySelectorAll('[data-act=filter]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===id));$('#scene-grid').innerHTML=ui.filterScenes(category,$('#scene-search').value);},
   'pick-tutor':id=>{selectedTutor=id;navigate('tutors',false);},
-  'preview-voice':()=>{const d=Object.fromEntries(new FormData($('#tutor-form')));const ok=speak('Take your time. What would you like to practise?',{...state.prefs,...d,tutor:selectedTutor,sound:true},()=>{});if(!ok)snack('No local English voice is available. Captions are available.');},
+  'preview-voice':async()=>{
+    speechRequest?.abort();cancelSpeech();
+    const prefs={...state.prefs,...Object.fromEntries(new FormData($('#tutor-form'))),tutor:selectedTutor,sound:true};
+    const text=scenarios.daily.opening;
+    if(state.config.live && state.config.provider==='Groq' && prefs.engine==='live' && prefs.adult){
+      const controller=speechRequest=new AbortController();
+      try {
+        await playLiveSpeech(text,prefs,controller.signal,()=>{},()=>{});
+        return;
+      } catch {
+        if(controller.signal.aborted)return;
+        snack('Live voice unavailable. Playing the backup preview.');
+      }
+    }
+    if(!speak(text,prefs,()=>{},()=>snack('Preview unavailable.')))snack('Preview unavailable.');
+  },
   'pause-voice':()=>{voiceConversation=false;voiceInput.cancel();setPhase('ready');},
   mic:requestMic,'allow-mic':()=>{const keep=$('#remember-mic').checked;closeDialog();micAllowedFor=session.mode;if(keep){state.prefs.micConsent=session.mode;persistPrefs();}startMic();},
   hint:showHint,end:askEnd,finish,dismiss:closeDialog,sound:changeSound,

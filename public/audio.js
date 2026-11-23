@@ -3,15 +3,16 @@ import { playClip, stopClip } from './clip-audio.js';
 export function localVoices() {
   return (window.speechSynthesis?.getVoices() || []).filter(v=>v.localService && /^en[-_]/i.test(v.lang));
 }
-export function voiceFor(prefs) {
-  const voices=localVoices();
-  const chosen = voices.find(voice => voice.voiceURI === prefs.voice);
-  if (chosen) return chosen;
-  // Web Speech provides no gender field. Use known voice names or the bundled tutor voice.
-  const names = prefs.tutor === 'jay'
+export function tutorVoices(tutor) {
+  const names = tutor === 'jay'
     ? /\b(david|mark|george|daniel|alex|male)\b/i
     : /\b(zira|hazel|samantha|victoria|karen|moira|tessa|susan|female)\b/i;
-  const matching = voices.filter(voice => names.test(voice.name));
+  return localVoices().filter(voice => names.test(voice.name));
+}
+export function voiceFor(prefs) {
+  const matching = tutorVoices(prefs.tutor);
+  const chosen = matching.find(voice => voice.voiceURI === prefs.voice);
+  if (chosen) return chosen;
   return matching.find(voice => voice.lang.replace('_', '-') === prefs.accent) || matching[0];
 }
 export function speak(text,prefs,onState,onError) {
