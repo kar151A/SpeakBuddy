@@ -1,3 +1,4 @@
+import { speechText } from './speech-text.js';
 import { playClip, stopClip } from './clip-audio.js';
 
 export function localVoices() {
@@ -21,7 +22,7 @@ export function speak(text,prefs,onState,onError) {
   const voice=voiceFor(prefs);
   if (!voice || !window.SpeechSynthesisUtterance) return playClip(text,prefs,onState,onError);
   window.speechSynthesis.cancel();
-  const utterance=new SpeechSynthesisUtterance(text);
+  const utterance=new SpeechSynthesisUtterance(speechText(text));
   utterance.voice=voice; utterance.lang=voice.lang; utterance.rate=Number(prefs.speed);
   utterance.onstart=()=>onState(true);
   utterance.onend=()=>onState(false);

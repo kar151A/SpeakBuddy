@@ -1,3 +1,4 @@
+import { speechText } from './speech-text.js';
 import { voiceCues } from './voice-cues.js';
 
 let context, source, generation=0;
@@ -45,7 +46,7 @@ export async function playLiveSpeech(text, prefs, signal, onState, onMouth) {
   const response = await fetch('/api/v1/speech', {
     method:'POST', signal,
     headers:{'Content-Type':'application/json','X-SpeakBuddy-Consent':'adult-live-v1'},
-    body:JSON.stringify({text,tutor:prefs.tutor})
+    body:JSON.stringify({text:speechText(text,true),tutor:prefs.tutor})
   });
   if (!response.ok) throw Error('Cloud voice unavailable');
   const buffer = await context.decodeAudioData(await response.arrayBuffer());
