@@ -14,10 +14,11 @@ function collect(directory) {
 }
 collect('');
 // These four modules have no imports. Their named exports remain valid in a single Worker ES module.
-const sources = ['public/catalog.js','src/prompts.js','src/records.js','src/api.js','src/accounts.js'].map(read);
+const sources = ['public/catalog.js','src/prompts.js','src/records.js','src/api.js','src/accounts.js','src/email-accounts.js'].map(read);
 const worker = `
 const assets = ${JSON.stringify(assets)};
-const handle = withHostedAccounts(createApi({tutors,scenarios,levels,languages},{tutorPrompt,grammarPrompt,rolePrompt},{validReport,saveReport,readReports}));
+const core = createApi({tutors,scenarios,levels,languages},{tutorPrompt,grammarPrompt,rolePrompt},{validReport,saveReport,readReports});
+const handle = withEmailAccounts(core,withHostedAccounts(core));
 export default {
   async fetch(request,env) {
     const url = new URL(request.url);

@@ -46,3 +46,7 @@ dialog{width:min(340px,calc(100vw - 32px));color:var(--ink);border:1px solid var
 .signin-panel{min-height:90%;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:18px;padding:20px 5px}
 .signin-panel h1{max-width:9em}.signin-panel p{color:var(--muted);line-height:1.5;font-size:16px}
 .login-link{text-decoration:none}.phone-tile:focus-visible,.login-link:focus-visible{outline:3px solid #35277d;outline-offset:4px}
+.signin-panel .form-stack{margin:0}
+.signin-panel .text-button{align-self:center}
+#account-status:empty{display:none}
+#account-status{font-size:14px}

@@ -8,6 +8,7 @@ import * as ui from './views.js';
 
 const $=selector=>document.querySelector(selector);
 const state={prefs:{...defaults},reports:[],config:{live:false,sync:false}};
+let emailStep='login', accountEmail='', emailBusy=false;
 let view='launcher', selectedScene='daily', selectedTutor='mira', category='All', from='home';
 let session=null, report=null, lastReportId='', phase='ready', hintTimer, snackTimer, pending, speakingVersion=0;
 let draftSource='typed', transcriptDraft='', sessionError='', micAllowedFor=null;
@@ -38,7 +39,7 @@ function navigate(next,focus=true) {
   $('#nav').hidden=!withNav;$('#nav').innerHTML=withNav?ui.nav(next):'';
   screen.className='screen-'+next;
   const pages={
-    launcher:ui.launcher,login:()=>ui.login(state.config),home:()=>ui.home(state),scenarios:()=>ui.library(),settings:()=>ui.settings(state),
+    launcher:ui.launcher,login:()=>ui.login(state.config,emailStep,accountEmail),home:()=>ui.home(state),scenarios:()=>ui.library(),settings:()=>ui.settings(state),
     tutors:()=>ui.tutorStudio(state,selectedTutor),progress:()=>ui.progress(state),
     setup:()=>ui.setup(state,selectedScene),call:()=>ui.callView(session,state.prefs),
     summary:()=>ui.summary(report,state.reports.some(r=>r.id===report.id),report.id===lastReportId)
@@ -49,7 +50,8 @@ function navigate(next,focus=true) {
   if(focus)screen.focus({preventScroll:true});
 }
 function goBack() {
-  if(view==='login')navigate('launcher');
+  if(view==='login' && emailStep!=='login')showEmailStep('login');
+  else if(view==='login')navigate('launcher');
   else if(view==='setup')navigate(from);
   else if(view==='summary')navigate(from==='progress'?'progress':'home');
   else navigate('home');
@@ -219,7 +221,39 @@ function changeSound() {
   if(!state.prefs.sound){speechRequest?.abort();voiceConversation=false;speakingVersion++;cancelSpeech();if(phase==='speaking')setPhase('ready');}
   else if(['ready','speaking'].includes(phase))speakTutor();
 }
+function showEmailStep(step,message=''){
+  emailStep=step;
+  navigate('login');
+  $('#account-status').textContent=message;
+}
+
+async function emailAction(action,form) {
+  if(emailBusy)return;
+  const payload=form?Object.fromEntries(new FormData(form)):{};
+  if(payload.email)accountEmail=payload.email.trim();
+  payload.email=accountEmail;
+  const panel=$('.signin-panel');
+  emailBusy=true;
+  panel.querySelectorAll('button').forEach(button=>button.disabled=true);
+  $('#account-status').textContent=action==='resend'?'Requesting another code…':'Please wait…';
+  try {
+    const res=await fetch('/api/v1/email/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
+    if(!panel.isConnected)return;
+    if(data.verificationRequired){showEmailStep('verify',data.error);return;}
+    if(!res.ok)throw Error(data.error||'Could not complete this request.');
+    if(action==='login'){location.assign('/?open=speakbuddy');return;}
+    if(action==='register'){showEmailStep('verify');return;}
+    if(action==='verify'){showEmailStep('login','Email verified. Log in with your password.');return;}
+    $('#account-status').textContent='Check your inbox for the latest code.';
+  } catch(e){if(panel.isConnected)$('#account-status').textContent=e.message||'Connection failed. Please try again.';}
+  finally{emailBusy=false;panel.querySelectorAll('button').forEach(button=>button.disabled=false);}
+}
+
 const actions={
+  'email-register':()=>showEmailStep('register'),
+  'email-login':()=>showEmailStep('login'),
+  'email-resend':()=>emailAction('resend'),
   'open-buddy':openBuddy,
   home:()=>navigate('home'),settings:()=>navigate('settings'),scenarios:()=>navigate('scenarios'),back:goBack,
   nav:id=>{selectedTutor=state.prefs.tutor;navigate(id);},
@@ -261,8 +295,9 @@ document.addEventListener('click',async e=>{
   try{await actions[b.dataset.act]?.(b.dataset.id);}catch(err){snack(err.message||'Please try again.');}
 });
 document.addEventListener('submit',async e=>{
-  const f=e.target;if(f.getAttribute('action')==='/api/v1/auth/logout')return;
+  const f=e.target;if(['/api/v1/auth/logout','/api/v1/email/logout'].includes(f.getAttribute('action')))return;
   e.preventDefault();
+  if(f.id==='email-form')return emailAction(emailStep,f);
   if(f.id==='turn-form')return submitTurn();
   if(f.id==='setup-form')return begin(f);
   const d=new FormData(f);

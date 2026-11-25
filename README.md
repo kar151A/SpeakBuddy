@@ -68,3 +68,9 @@ Copy the four account settings from `.env.example` to your local `.env`. Use the
 Local SQLite migrations run at startup. For a separate Auth0-enabled deployment apply `drizzle/0001_account_sessions.sql` to its existing D1 database before enabling the four environment settings. A verified account opens the speaking studio. Account backups are opt-in under Settings. Prior guest reports remain in the device-only profile.
 
 The published SpeakBuddy site uses the host’s built-in ChatGPT sign-in after the learner opens SpeakBuddy from the phone home screen. Its Worker takes identity from the hosting platform and stores reports under the same account ID used by earlier hosted versions. The Auth0 credentials above apply to the local Node app.
+
+### SpeakBuddy email/password accounts and signup codes
+
+Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` for your Supabase Auth project in the local environment or hosted Site settings. Use a publishable key. Enable the Email provider and **Confirm email**. Keep email autoconfirm off. In the **Confirm signup** email template, include `{{ .Token }}` so the learner receives a numeric code to enter in SpeakBuddy. Configure an authenticated SMTP sender for delivery to public learners. Restart the local app or redeploy the hosted site after setting the environment.
+
+Registration collects the email and password, then opens the code form. Verification returns the learner to Log in. Only a successful password login for a confirmed address creates the SpeakBuddy session. OTP delivery, expiration, password storage, and provider rate limits are managed by Supabase. Existing Google/platform accounts can continue using the other sign-in option. Histories are scoped to provider identities.

@@ -46,13 +46,24 @@ export function launcher() {
       <button class="phone-tile" type="button" data-act="open-buddy" aria-label="Open SpeakBuddy"><img class="app-icon" src="/mark.svg" alt="">SpeakBuddy</button>
     </div></section>`;
 }
-export function login(config) {
-  let action;
-  if(config.connectionError)action=btn('open-buddy','Retry connection','secondary wide');
-  else if(config.accounts)action='<a class="primary wide login-link" target="_top" href="/api/v1/auth/login">Continue to sign in</a>';
-  else action='<p class="fine">To enable local sign-in, configure Auth0 in the server’s .env file and restart SpeakBuddy.</p>';
-  return `<section class="signin-panel"><img src="/mark.svg" width="68" height="68" alt="">
-    <h1>Sign in to SpeakBuddy</h1><p>${config.connectionError?'SpeakBuddy couldn’t reach the server.':config.accountProvider==='hosted'?'Use your Google account or email on the ChatGPT sign-in page.':'Use your Google account or email to open your speaking studio.'}</p>${action}</section>`;
+export function login(config, step='login', email='') {
+  if(config.connectionError)return `<section class="signin-panel"><h1>Log in</h1><p>SpeakBuddy couldn’t reach the server.</p>${btn('open-buddy','Retry connection','secondary wide')}</section>`;
+  const register=step==='register', verify=step==='verify';
+  const heading=verify?'Verify your email':register?'Create your account':'Log in to SpeakBuddy';
+  const other=register||verify?btn('email-login','Back to log in','text-button'):btn('email-register','Create an account','text-button');
+  const alternate=config.accounts?`<a class="secondary wide login-link" target="_top" href="/api/v1/auth/login">${config.emailAccounts?'Other sign-in options':register?'Continue to sign up':'Continue to log in'}</a>`:'';
+  let form;
+  if(config.emailAccounts){
+    const fields=verify?`<p>Enter the code sent to <b>${esc(email)}</b>.</p><label class="field"><span>Email code</span><input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" maxlength="10" required></label>`
+      :`<label class="field"><span>Email address</span><input type="email" name="email" value="${esc(email)}" autocomplete="email" maxlength="254" required></label>
+      <label class="field"><span>Password</span><input type="password" name="password" autocomplete="${register?'new-password':'current-password'}" ${register?'minlength="10" placeholder="At least 10 characters"':''} maxlength="512" required></label>`;
+    form=`<form id="email-form" class="form-stack wide">${fields}<button class="primary wide" type="submit">${verify?'Verify email':register?'Register and email me a code':'Log in'}</button></form>
+      ${verify?btn('email-resend','Resend code','text-button'):alternate}`;
+  } else {
+    const message=config.accounts?(register?'Choose Sign up on the next page to create an account with email.':'Continue with your existing email or Google account.'):'Email sign-in needs to be configured on this installation.';
+    form=`<p>${message}</p>${alternate}`;
+  }
+  return `<section class="signin-panel"><img src="/mark.svg" width="56" height="56" alt=""><h1>${heading}</h1>${form}<p aria-live="polite" id="account-status"></p>${other}</section>`;
 }
 export function home({prefs:p,reports}) {
   const t=tutors[p.tutor];
@@ -136,7 +147,7 @@ export function progress({reports,prefs:p}) {
 export function settings({prefs:p,config}) {
   const signOut=config.accountProvider==='hosted'
     ? '<a class="secondary" target="_top" href="/signout-with-chatgpt?return_to=%2F">Sign out</a>'
-    : '<form method="post" action="/api/v1/auth/logout"><button class="secondary">Sign out</button></form>';
+    : `<form method="post" action="${config.accountProvider==='email'?'/api/v1/email/logout':'/api/v1/auth/logout'}"><button class="secondary">Sign out</button></form>`;
   const account=config.accounts ? (config.account
     ? `<p>${config.account.email?'Signed in as '+esc(config.account.email):'You’re signed in.'}</p>${signOut}`
     : '') : '';
