@@ -8,7 +8,7 @@ import * as ui from './views.js';
 
 const $=selector=>document.querySelector(selector);
 const state={prefs:{...defaults},reports:[],config:{live:false,sync:false}};
-let view='home', selectedScene='daily', selectedTutor='mira', category='All', from='home';
+let view='launcher', selectedScene='daily', selectedTutor='mira', category='All', from='home';
 let session=null, report=null, lastReportId='', phase='ready', hintTimer, snackTimer, pending, speakingVersion=0;
 let draftSource='typed', transcriptDraft='', sessionError='', micAllowedFor=null;
 const screen=$('#screen'), modal=$('#modal');
@@ -26,16 +26,19 @@ function showDialog(title,body,buttons) {
 function closeDialog() { if(modal.open)modal.close(); }
 function notice(message) {const e=$('#call-error');if(e)e.textContent=message;sessionError=message;}
 function navigate(next,focus=true) {
+  if(!['launcher','login'].includes(next) && !state.config.account)next='login';
   clearTimeout(hintTimer);
   if(view==='tutors'){speechRequest?.abort();cancelSpeech();}
   if(view==='call' && next!=='call'){voiceConversation=false;stopMedia();}
   view=next;
-  $('#header').innerHTML=ui.header(next);
+  $('.glass').dataset.screen=next;
+  $('#header').hidden=next==='launcher';
+  $('#header').innerHTML=next==='launcher'?'':ui.header(next);
   const withNav=['home','tutors','progress'].includes(next);
   $('#nav').hidden=!withNav;$('#nav').innerHTML=withNav?ui.nav(next):'';
   screen.className='screen-'+next;
   const pages={
-    home:()=>ui.home(state),scenarios:()=>ui.library(),settings:()=>ui.settings(state),
+    launcher:ui.launcher,login:()=>ui.login(state.config),home:()=>ui.home(state),scenarios:()=>ui.library(),settings:()=>ui.settings(state),
     tutors:()=>ui.tutorStudio(state,selectedTutor),progress:()=>ui.progress(state),
     setup:()=>ui.setup(state,selectedScene),call:()=>ui.callView(session,state.prefs),
     summary:()=>ui.summary(report,state.reports.some(r=>r.id===report.id),report.id===lastReportId)
@@ -46,7 +49,8 @@ function navigate(next,focus=true) {
   if(focus)screen.focus({preventScroll:true});
 }
 function goBack() {
-  if(view==='setup')navigate(from);
+  if(view==='login')navigate('launcher');
+  else if(view==='setup')navigate(from);
   else if(view==='summary')navigate(from==='progress'?'progress':'home');
   else navigate('home');
 }
@@ -216,6 +220,7 @@ function changeSound() {
   else if(['ready','speaking'].includes(phase))speakTutor();
 }
 const actions={
+  'open-buddy':openBuddy,
   home:()=>navigate('home'),settings:()=>navigate('settings'),scenarios:()=>navigate('scenarios'),back:goBack,
   nav:id=>{selectedTutor=state.prefs.tutor;navigate(id);},
   start:()=>{selectedScene=state.prefs.scenario;from=view;navigate('setup');},
@@ -277,11 +282,30 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('pagehide',stopMedia);
 function clock() {$('#clock').textContent=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}).replace(/\s?[AP]M/i,'');}
 clock();setInterval(clock,30000);
-try {
-  const response=await fetch('/api/v1/config');
-  if(response.ok)state.config=await response.json();
-  selectAccount(state.config.account?.owner);
-} catch {}
-try{Object.assign(state,await loadDevice());}catch{snack('Device storage unavailable. You can still practise in this tab.');}
-selectedTutor=state.prefs.tutor;selectedScene=state.prefs.scenario;
-navigate('home',false);
+async function openBuddy() {
+  const button=$('[data-act="open-buddy"]');
+  if(button)button.disabled=true;
+  try {
+    const response=await fetch('/api/v1/config',{cache:'no-store'});
+    if(!response.ok)throw Error('Connection failed');
+    state.config=await response.json();
+  } catch {
+    state.config={connectionError:true};
+  }
+  if(!state.config.account){
+    navigate('login');
+    return;
+  }
+  selectAccount(state.config.account.owner);
+  try{Object.assign(state,await loadDevice());}catch{snack('Device storage unavailable. You can still practise in this tab.');}
+  selectedTutor=state.prefs.tutor;selectedScene=state.prefs.scenario;
+  navigate('home');
+}
+
+window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
+if(new URLSearchParams(location.search).get('open')==='speakbuddy'){
+  history.replaceState(null,'','/');
+  await openBuddy();
+} else {
+  navigate('launcher',false);
+}

@@ -18,6 +18,7 @@ test('verified account sessions isolate access and expire on logout',async t=>{
   const headers={cookie:login.headers.get('set-cookie').split(';')[0]};
   assert.equal((await call('auth/callback?code=x&state=wrong',{headers})).status,400);
   const callback=await call('auth/callback?code=x&state='+state,{headers});
+  assert.equal(callback.headers.get('location'),'/?open=speakbuddy');
   headers.cookie=callback.headers.get('set-cookie').split(';')[0];
   const config=await (await call('config',{headers})).json();
   assert.equal(config.account.email,'learner@example.org');
@@ -32,7 +33,7 @@ test('hosted sign-in works without Auth0 and scopes backups to the active identi
   const handle=withHostedAccounts(async(req,env,owner)=>Response.json({sync:!!owner}));
   const call=(path,headers={})=>handle(new Request('https://example.org/api/v1/'+path,{headers}),{});
   assert.equal((await (await call('config')).json()).accountProvider,'hosted');
-  assert.equal((await call('auth/login')).headers.get('Location'),'/signin-with-chatgpt?return_to=%2F');
+  assert.equal((await call('auth/login')).headers.get('Location'),'/signin-with-chatgpt?return_to=%2F%3Fopen%3Dspeakbuddy');
   const headers={'oai-authenticated-user-id':'learner','oai-authenticated-user-email':'user@example.org'};
   assert.equal((await (await call('config',headers)).json()).account.email,'user@example.org');
   assert.equal((await call('sessions',headers)).status,409);

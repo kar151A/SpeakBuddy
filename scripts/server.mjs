@@ -1,5 +1,4 @@
 import { createServer } from 'node:http';
-import { createHash, randomBytes } from 'node:crypto';
 import { dirname, resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -23,15 +22,11 @@ const port = Number(arg('--port') || process.env.PORT || 5173);
 createServer(async (req,res)=>{
   try {
     const url = new URL(req.url, 'http://' + req.headers.host);
-    const matched = req.headers.cookie?.match(/(?:^|; )sb-device=([a-f0-9]{64})(?:;|$)/);
-    const token = matched?.[1] || randomBytes(32).toString('hex');
-    if (!matched) res.setHeader('Set-Cookie','sb-device='+token+'; HttpOnly; Path=/; SameSite=Strict; Max-Age=2592000');
-    const owner = createHash('sha256').update(token).digest('hex');
     let response;
     if (url.pathname.startsWith('/api/')) {
       const init = {method:req.method,headers:req.headers};
       if (!['GET','HEAD'].includes(req.method)) Object.assign(init,{body:req,duplex:'half'});
-      response = await api(new Request(url,init), {...process.env,DB:db},owner);
+      response = await api(new Request(url,init), {...process.env,DB:db});
     } else {
       const filename = resolve(root,'.'+decodeURIComponent(url.pathname==='/'?'/index.html':url.pathname));
       if (!filename.startsWith(root+sep) || !mime[extname(filename)]) throw new Error('Missing');

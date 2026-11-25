@@ -24,3 +24,25 @@ dialog{width:min(340px,calc(100vw - 32px));color:var(--ink);border:1px solid var
 @media(max-height:690px) and (min-width:481px){.desk{padding:6px}.device{height:calc(100svh - 12px)}.status{height:32px}#header{min-height:47px}.welcome{padding:4px 0 10px}.home-line{height:11px}.week-card{margin-top:13px}.section-head{margin-top:12px}}
 
 @media(prefers-reduced-motion:no-preference){.call-stage.audio-driven.talking:not(.still) .frame-talk{animation:none;opacity:var(--mouth,0)}}
+
+.glass[data-screen="launcher"]{
+  background:radial-gradient(ellipse at 12% 93%,#29235c 0 31%,transparent 32%),
+    radial-gradient(ellipse at 120% 110%,#a597ea 0 45%,#7462bc 46%,transparent 58%),
+    linear-gradient(152deg,#cfcaf9 3%,#aba5de 40%,#554e96 76%,#37316e);
+}
+.glass[data-screen="launcher"] .home-line{background:transparent}
+.glass[data-screen="launcher"] .home-line i{background:#fff}
+.springboard{padding-top:clamp(28px,7vh,72px)}
+.date-widget{color:#2c2751;padding:12px 4px 34px}
+.date-widget span{font-size:16px;font-weight:600}
+.date-widget strong{display:block;font:500 clamp(32px,6vh,52px)/1.1 var(--display);letter-spacing:-1.5px}
+.phone-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.phone-tile{color:#241d42;display:flex;align-items:center;flex-direction:column;gap:7px;font-size:13px;font-weight:600;padding:0;letter-spacing:-.3px}
+.app-icon{width:min(100%,60px);aspect-ratio:1;border-radius:24%;box-shadow:0 3px 7px #32245638;display:grid;place-content:center}
+.date-icon{background:white;color:#24212c;text-align:center;line-height:1}
+.date-icon small{font-size:11px;color:#ac3346}.date-icon b{font-size:27px;font-weight:500}
+.clock-icon{background:#252436;color:white}.clock-icon svg{width:100%;max-width:46px}
+.notes-icon{background:linear-gradient(#ffdb66 0 30%,transparent 30%),repeating-linear-gradient(#fff 0 10px,#e6e4ee 10px 11px)}
+.signin-panel{min-height:90%;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:18px;padding:20px 5px}
+.signin-panel h1{max-width:9em}.signin-panel p{color:var(--muted);line-height:1.5;font-size:16px}
+.login-link{text-decoration:none}.phone-tile:focus-visible,.login-link:focus-visible{outline:3px solid #35277d;outline-offset:4px}

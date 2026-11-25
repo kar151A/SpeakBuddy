@@ -1,12 +1,12 @@
-// Authentication is optional so existing device-only installations keep working.
+// Local installations require a configured identity provider for learner access.
 export function withAccounts(api) {
   const token = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), b=>b.toString(16).padStart(2,'0')).join('');
   async function digest(value) {
     const bytes = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
     return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
   }
-  return async function handle(request,env,device) {
-    if (!(env.AUTH0_DOMAIN && env.AUTH0_CLIENT_ID && env.AUTH0_CLIENT_SECRET && env.APP_ORIGIN)) return api(request,env,device);
+  return async function handle(request,env) {
+    if (!(env.AUTH0_DOMAIN && env.AUTH0_CLIENT_ID && env.AUTH0_CLIENT_SECRET && env.APP_ORIGIN)) return api(request,env,null);
     const url=new URL(request.url), issuer='https://'+env.AUTH0_DOMAIN;
     const callback=new URL('/api/v1/auth/callback',env.APP_ORIGIN).href;
     const secure=callback.startsWith('https:')?'; Secure':'';
@@ -42,7 +42,7 @@ export function withAccounts(api) {
       const owner='account-'+await digest(issuer+'|'+sub), id=token();
       await db.prepare('DELETE FROM account_sessions WHERE expires<=?').bind(now).run();
       await db.prepare('INSERT INTO account_sessions VALUES (?,?,?,?)').bind(await digest(id),owner,email||'',now+604800).run();
-      return redirect('/',cookie('sb-account',id,604800));
+      return redirect('/?open=speakbuddy',cookie('sb-account',id,604800));
     }
     if(url.pathname==='/api/v1/auth/logout' && request.method==='POST'){
       if(request.headers.get('Origin')!==new URL(env.APP_ORIGIN).origin)return failure('Invalid origin.',403);
@@ -68,7 +68,7 @@ export function withHostedAccounts(api) {
     const path = new URL(request.url).pathname;
     if (path === '/api/v1/auth/login' && request.method === 'GET') {
       return new Response(null, {status:303, headers:{
-        Location:'/signin-with-chatgpt?return_to=%2F', 'Cache-Control':'no-store'
+        Location:'/signin-with-chatgpt?return_to=%2F%3Fopen%3Dspeakbuddy', 'Cache-Control':'no-store'
       }});
     }
     if (path === '/api/v1/config' && request.method === 'GET') {

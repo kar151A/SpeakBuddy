@@ -17,7 +17,7 @@ const title=(label,txt)=>`<div class="page-intro"><p class="eyebrow">${esc(label
 export function header(view) {
   if(view==='home') return `<div class="brand"><img src="/mark.svg" alt=""><span>SpeakBuddy</span></div><button class="icon-btn" data-act="settings" aria-label="Settings">${icon('gear',21)}</button>`;
   if(view==='call')return `<span class="call-heading">${icon('wave',18)} Speaking session</span>${btn('end',icon('end',18)+' End','end-link')}`;
-  const names={tutors:'Tutor studio',scenarios:'Role-play library',setup:'Session setup',summary:'Practice report',progress:'Your progress',settings:'Settings'};
+  const names={login:'SpeakBuddy',tutors:'Tutor studio',scenarios:'Role-play library',setup:'Session setup',summary:'Practice report',progress:'Your progress',settings:'Settings'};
   return `<button class="icon-btn back" aria-label="Back" data-act="back">${icon('back')}</button><strong class="bar-title">${names[view]||''}</strong><span class="header-space"></span>`;
 }
 export function nav(view) {
@@ -33,15 +33,30 @@ function weekCard(reports,prefs) {
   return `<div class="week-card"><div class="week-line"><span class="week-mark">${icon('calendar',18)}</span><h3>This week</h3><span class="goal">${count} / ${prefs.goal} days</span></div>
   <div class="day-row">${days.map((d,i)=>`<div class="day ${d.active?'done':''} ${d.today?'today':''}" aria-label="${d.day.toLocaleDateString(undefined,{weekday:'long'})}, ${d.active?'practised':'no saved practice'}"><i>${d.active?icon('check',14):''}</i><span>${['M','T','W','T','F','S','S'][i]}</span></div>`).join('')}</div></div>`;
 }
-function loginLink(config) {
-  const hosted=config.accountProvider==='hosted';
-  const href=hosted?'/signin-with-chatgpt?return_to=%2F':'/api/v1/auth/login';
-  return `<a class="secondary" href="${href}" target="_top">${hosted?'Sign in with ChatGPT':'Sign in with email or Google'}</a>`;
+export function launcher() {
+  const today=new Date();
+  const day=today.toLocaleDateString(undefined,{weekday:'short'});
+  return `<section class="springboard" aria-label="Phone home screen">
+    <div class="date-widget"><span>${esc(today.toLocaleDateString(undefined,{month:'long',year:'numeric'}))}</span>
+    <strong>${esc(today.toLocaleDateString(undefined,{weekday:'long'}))}</strong></div>
+    <div class="phone-grid">
+      <div class="phone-tile" aria-hidden="true"><div class="app-icon date-icon"><small>${esc(day)}</small><b>${today.getDate()}</b></div>Calendar</div>
+      <div class="phone-tile" aria-hidden="true"><div class="app-icon clock-icon">${icon('clock',48)}</div>Clock</div>
+      <div class="phone-tile" aria-hidden="true"><div class="app-icon notes-icon"></div>Notes</div>
+      <button class="phone-tile" type="button" data-act="open-buddy" aria-label="Open SpeakBuddy"><img class="app-icon" src="/mark.svg" alt="">SpeakBuddy</button>
+    </div></section>`;
 }
-export function home({prefs:p,reports,config}) {
+export function login(config) {
+  let action;
+  if(config.connectionError)action=btn('open-buddy','Retry connection','secondary wide');
+  else if(config.accounts)action='<a class="primary wide login-link" target="_top" href="/api/v1/auth/login">Continue to sign in</a>';
+  else action='<p class="fine">To enable local sign-in, configure Auth0 in the server’s .env file and restart SpeakBuddy.</p>';
+  return `<section class="signin-panel"><img src="/mark.svg" width="68" height="68" alt="">
+    <h1>Sign in to SpeakBuddy</h1><p>${config.connectionError?'SpeakBuddy couldn’t reach the server.':config.accountProvider==='hosted'?'Use your Google account or email on the ChatGPT sign-in page.':'Use your Google account or email to open your speaking studio.'}</p>${action}</section>`;
+}
+export function home({prefs:p,reports}) {
   const t=tutors[p.tutor];
   return `<section class="home-content"><div class="welcome"><p class="eyebrow">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})}</p><h1>${p.name?'Hello, '+esc(p.name)+'.':'Let’s talk.'}</h1></div>
-  ${config?.accounts && !config.account ? loginLink(config) : ''}
   <article class="hero">${art(p.tutor+'-rest','class="hero-portrait"')}<div class="hero-shade"></div><div class="hero-orbits" aria-hidden="true"></div>
   <div class="hero-copy"><span class="tutor-label">${icon('wave',14)} AI TUTOR</span><h2><span>Practice with</span><em>${t.name}.</em></h2><p>${t.description}</p>
   ${btn('start',icon('mic',16)+' Start practice','hero-button')}</div></article>
@@ -78,7 +93,6 @@ export function setup({prefs:p,config},scenario) {
   ${field('Correction timing','corrections',['During practice','Report only'],p.corrections)}
   ${field('Conversation mode','engine',config.live?[['guided','Guided practice'],['live','Live AI']]:[['guided','Guided practice']],config.live?'live':'guided')}
   <p class="fine" id="mode-note">${config.live?'Live AI sends confirmed turns, recent conversation and opted-in practice patterns to the configured AI provider. Live microphone audio goes to the same provider.':'Guided practice uses built-in questions and language patterns. The microphone is optional.'}</p>
-  ${config.accounts && !config.account ? loginLink(config) : ''}
   ${toggle('remember','Remember my practice','Keep reports and short correction excerpts on this device for 30 days.',p.remember)}
   <label class="agree"><input type="checkbox" name="adult" required ${p.adult?'checked':''}><span>I’m 18 or older and understand this is an AI tutor.</span></label>
   <button type="submit" class="primary wide">${icon('mic',18)} Begin session</button></form>`;
@@ -125,7 +139,7 @@ export function settings({prefs:p,config}) {
     : '<form method="post" action="/api/v1/auth/logout"><button class="secondary">Sign out</button></form>';
   const account=config.accounts ? (config.account
     ? `<p>${config.account.email?'Signed in as '+esc(config.account.email):'You’re signed in.'}</p>${signOut}`
-    : loginLink(config)) : '';
+    : '') : '';
   return title('Preferences','Your settings.')+account+`<form id="settings-form" class="form-stack">
   <label class="field"><span>First name or nickname</span><input name="name" maxlength="26" value="${esc(p.name)}" placeholder="Optional"></label>
   ${field('Weekly practice goal','goal',[[2,'2 days'],[3,'3 days'],[5,'5 days'],[7,'7 days']],p.goal)}
