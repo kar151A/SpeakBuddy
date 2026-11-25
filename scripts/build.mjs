@@ -17,11 +17,11 @@ collect('');
 const sources = ['public/catalog.js','src/prompts.js','src/records.js','src/api.js','src/accounts.js'].map(read);
 const worker = `
 const assets = ${JSON.stringify(assets)};
-const handle = withAccounts(createApi({tutors,scenarios,levels,languages},{tutorPrompt,grammarPrompt,rolePrompt},{validReport,saveReport,readReports}));
+const handle = withHostedAccounts(createApi({tutors,scenarios,levels,languages},{tutorPrompt,grammarPrompt,rolePrompt},{validReport,saveReport,readReports}));
 export default {
   async fetch(request,env) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith('/api/')) return handle(request,env,request.headers.get('oai-authenticated-user-id'));
+    if (url.pathname.startsWith('/api/')) return handle(request,env);
     const asset = assets[url.pathname==='/'?'/index.html':url.pathname];
     if (!asset || !['GET','HEAD'].includes(request.method)) return new Response('Not found',{status:404});
     const bytes = Uint8Array.from(atob(asset[1]), c=>c.charCodeAt(0));

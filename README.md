@@ -65,4 +65,6 @@ Create an Auth0 Regular Web Application. Enable the email/password database conn
 
 Copy the four account settings from `.env.example` to your local `.env`. Use the Auth0 domain without a scheme, the application's client ID and secret, and the exact origin you open in the browser. Restart the app. Open Settings and choose **Sign in with email or Google**. Passwords stay at Auth0. Sign-out revokes the SpeakBuddy session. Separate provider identities have separate practice histories.
 
-Local SQLite migrations run at startup. For a hosted Worker apply `drizzle/0001_account_sessions.sql` to its existing D1 database before enabling the four environment settings. With accounts enabled, guests can use guided practice. Account backups are opt-in under Settings. Prior guest reports remain in the device-only profile.
+Local SQLite migrations run at startup. For a separate Auth0-enabled deployment apply `drizzle/0001_account_sessions.sql` to its existing D1 database before enabling the four environment settings. With accounts enabled, guests can use guided practice. Account backups are opt-in under Settings. Prior guest reports remain in the device-only profile.
+
+The published SpeakBuddy site uses the host’s built-in ChatGPT sign-in on Home and Settings. Its Worker takes identity from the hosting platform and stores reports under the same account ID used by earlier hosted versions. The Auth0 credentials above apply to the local Node app.

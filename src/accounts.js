@@ -60,3 +60,28 @@ export function withAccounts(api) {
     return api(request,env,account?.owner);
   };
 }
+
+// Only the deployed Worker uses this adapter. The local Node server never trusts identity headers.
+export function withHostedAccounts(api) {
+  return async function handle(request, env) {
+    const owner = request.headers.get('oai-authenticated-user-id');
+    const path = new URL(request.url).pathname;
+    if (path === '/api/v1/auth/login' && request.method === 'GET') {
+      return new Response(null, {status:303, headers:{
+        Location:'/signin-with-chatgpt?return_to=%2F', 'Cache-Control':'no-store'
+      }});
+    }
+    if (path === '/api/v1/config' && request.method === 'GET') {
+      const base = await api(request, env, owner);
+      const account = owner ? {owner, email:request.headers.get('oai-authenticated-user-email') || ''} : null;
+      return Response.json({...await base.json(), accounts:true, accountProvider:'hosted', account}, {
+        headers:{'Cache-Control':'no-store'}
+      });
+    }
+    if (owner && (path.startsWith('/api/v1/sessions') || path === '/api/v1/me')
+        && request.headers.get('X-SpeakBuddy-Account') !== owner) {
+      return Response.json({error:'Your signed-in account changed. Refresh SpeakBuddy.'},{status:409});
+    }
+    return api(request, env, owner);
+  };
+}

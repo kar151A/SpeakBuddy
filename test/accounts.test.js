@@ -26,3 +26,15 @@ test('verified account sessions isolate access and expire on logout',async t=>{
   await call('auth/logout',{method:'POST',headers:{...headers,origin}});
   assert.equal((await (await call('config',{headers})).json()).account,null);
 });
+
+test('hosted sign-in works without Auth0 and scopes backups to the active identity',async()=>{
+  const {withHostedAccounts}=await import('../src/accounts.js');
+  const handle=withHostedAccounts(async(req,env,owner)=>Response.json({sync:!!owner}));
+  const call=(path,headers={})=>handle(new Request('https://example.org/api/v1/'+path,{headers}),{});
+  assert.equal((await (await call('config')).json()).accountProvider,'hosted');
+  assert.equal((await call('auth/login')).headers.get('Location'),'/signin-with-chatgpt?return_to=%2F');
+  const headers={'oai-authenticated-user-id':'learner','oai-authenticated-user-email':'user@example.org'};
+  assert.equal((await (await call('config',headers)).json()).account.email,'user@example.org');
+  assert.equal((await call('sessions',headers)).status,409);
+  assert.equal((await call('sessions',{...headers,'X-SpeakBuddy-Account':'learner'})).status,200);
+});

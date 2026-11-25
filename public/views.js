@@ -33,9 +33,15 @@ function weekCard(reports,prefs) {
   return `<div class="week-card"><div class="week-line"><span class="week-mark">${icon('calendar',18)}</span><h3>This week</h3><span class="goal">${count} / ${prefs.goal} days</span></div>
   <div class="day-row">${days.map((d,i)=>`<div class="day ${d.active?'done':''} ${d.today?'today':''}" aria-label="${d.day.toLocaleDateString(undefined,{weekday:'long'})}, ${d.active?'practised':'no saved practice'}"><i>${d.active?icon('check',14):''}</i><span>${['M','T','W','T','F','S','S'][i]}</span></div>`).join('')}</div></div>`;
 }
-export function home({prefs:p,reports}) {
+function loginLink(config) {
+  const hosted=config.accountProvider==='hosted';
+  const href=hosted?'/signin-with-chatgpt?return_to=%2F':'/api/v1/auth/login';
+  return `<a class="secondary" href="${href}" target="_top">${hosted?'Sign in with ChatGPT':'Sign in with email or Google'}</a>`;
+}
+export function home({prefs:p,reports,config}) {
   const t=tutors[p.tutor];
   return `<section class="home-content"><div class="welcome"><p class="eyebrow">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})}</p><h1>${p.name?'Hello, '+esc(p.name)+'.':'Let’s talk.'}</h1></div>
+  ${config?.accounts && !config.account ? loginLink(config) : ''}
   <article class="hero">${art(p.tutor+'-rest','class="hero-portrait"')}<div class="hero-shade"></div><div class="hero-orbits" aria-hidden="true"></div>
   <div class="hero-copy"><span class="tutor-label">${icon('wave',14)} AI TUTOR</span><h2><span>Practice with</span><em>${t.name}.</em></h2><p>${t.description}</p>
   ${btn('start',icon('mic',16)+' Start practice','hero-button')}</div></article>
@@ -72,7 +78,7 @@ export function setup({prefs:p,config},scenario) {
   ${field('Correction timing','corrections',['During practice','Report only'],p.corrections)}
   ${field('Conversation mode','engine',config.live?[['guided','Guided practice'],['live','Live AI']]:[['guided','Guided practice']],config.live?'live':'guided')}
   <p class="fine" id="mode-note">${config.live?'Live AI sends confirmed turns, recent conversation and opted-in practice patterns to the configured AI provider. Live microphone audio goes to the same provider.':'Guided practice uses built-in questions and language patterns. The microphone is optional.'}</p>
-  ${config.accounts && !config.account ? '<p><a target="_top" href="/api/v1/auth/login">Sign in with email or Google for Live AI</a></p>' : config.signInRequired?'<p class="fine">For open conversation and microphone transcription, <a href="/signin-with-chatgpt?return_to=%2F" target="_top">sign in to Live AI</a>.</p>':''}
+  ${config.accounts && !config.account ? loginLink(config) : ''}
   ${toggle('remember','Remember my practice','Keep reports and short correction excerpts on this device for 30 days.',p.remember)}
   <label class="agree"><input type="checkbox" name="adult" required ${p.adult?'checked':''}><span>I’m 18 or older and understand this is an AI tutor.</span></label>
   <button type="submit" class="primary wide">${icon('mic',18)} Begin session</button></form>`;
@@ -114,9 +120,12 @@ export function progress({reports,prefs:p}) {
   ${section('Recent sessions')}${reports.length?reports.map(r=>`<button class="history" data-act="report" data-id="${r.id}">${art(scenarios[r.scenario].art)}<span><b>${scenarios[r.scenario].title}</b><small>${dateText(r.date)} · ${r.turnCount} ${r.turnCount===1?'turn':'turns'}</small></span>${icon('next',16)}</button>`).join(''):`<div class="empty"><span>${icon('book',24)}</span><b>Your journal starts here</b><p>Save a session report to see your practice over time.</p>${btn('start','Start practice','secondary')}</div>`}`;
 }
 export function settings({prefs:p,config}) {
+  const signOut=config.accountProvider==='hosted'
+    ? '<a class="secondary" target="_top" href="/signout-with-chatgpt?return_to=%2F">Sign out</a>'
+    : '<form method="post" action="/api/v1/auth/logout"><button class="secondary">Sign out</button></form>';
   const account=config.accounts ? (config.account
-    ? `<p>Signed in as ${esc(config.account.email)}</p><form method="post" action="/api/v1/auth/logout"><button class="secondary">Sign out</button></form>`
-    : '<p><a class="secondary" target="_top" href="/api/v1/auth/login">Sign in with email or Google</a></p>') : '';
+    ? `<p>${config.account.email?'Signed in as '+esc(config.account.email):'You’re signed in.'}</p>${signOut}`
+    : loginLink(config)) : '';
   return title('Preferences','Your settings.')+account+`<form id="settings-form" class="form-stack">
   <label class="field"><span>First name or nickname</span><input name="name" maxlength="26" value="${esc(p.name)}" placeholder="Optional"></label>
   ${field('Weekly practice goal','goal',[[2,'2 days'],[3,'3 days'],[5,'5 days'],[7,'7 days']],p.goal)}
